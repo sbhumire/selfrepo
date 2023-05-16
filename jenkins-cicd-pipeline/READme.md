@@ -49,69 +49,73 @@ Get password from EC2
 	cat /var/lib/jenkins/secrets/initialAdminPassword
 Click "Install suggested plugins" and wait till all plugins are installed. This will take some time!!
 Once done log in to jenkins again 
-Go to Manage Jenkins > Manage plugins > Advance tab >search for "Docker pipeline plugin"
-Install the plugin
-http://<ec2-instance-public-ip>:8080/restart. Wait for jenkins to restart!!
+Go to Manage Jenkins > Manage plugins > Advance tab >search for "Docker pipeline"
+Install without restart
+Restart jenkins server
+	http://<ec2-instance-public-ip>:8080/restart. Wait for jenkins to restart!!
 
 Install Docker 
 Go back to the EC2 instance and sure you are logged in as root
 	sudo apt-get update
 	sudo apt-get install ca-certificates curl gnupg
-	echo \
-  "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
-  "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \
-  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-  sudo apt-get update
+	sudo install -m 0755 -d /etc/apt/keyrings
+	curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+	sudo chmod a+r /etc/apt/keyrings/docker.gpg
+
+		echo \
+	"deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+	"$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \
+	sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+  	sudo apt-get update
 	sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
 Verify that the Docker Engine installation is successful by running the hello-world image
 	sudo docker run hello-world
+
 Add jenkins to docker
 	adduser jenkins docker
 	adduser jenkins ubuntu
 	systemctl restart docker
-Login as jenkins & run
-	sudo su -jenkins
-	Docker login
-Restart jenkins server
-	http://<ec2-instance-public-ip>:8080/restart
-Create dockerhub account
+Login as jenkins 
+	su - jenkins
+	Docker login > Make sure to log in as jenkins user.  Create a docker Id if you don't have one: https://hub.docker.com
 
 Install npm and maven as root
-	apt-get update && apt-get install -y npm maven
+ 	sudo apt-get update && apt-get install -y npm maven
 
-Install Trivy
-	 wget https://github.com/aquasecurity/trivy/releases/download/v0.41.0/trivy_0.41.0_Linux-64bit.tar.gz
-	 tar –xzvf trivy.tar.gz
+Install Trivy as root user
+	 wget "https://github.com/aquasecurity/trivy/releases/download/v0.41.0/trivy_0.41.0_Linux-64bit.tar.gz"
+	 tar -xvf trivy_0.41.0_Linux-64bit.tar.gz
 	 mv trivy /usr/local/bin/
+	 
 Test Trivy installation
-	Trivy
+	trivy --version
 
-Login as jenkins user
-	su - jenkins
-Install Cosign
+Install Cosign as root 
 Go to https://github.com/sigstore/cosign/releases > Assets > cosign-linux_amd64 > get link
-	weget "https://github.com/sigstore/cosign/releases/download/v2.0.2/cosign-linux-amd64"
+	wget "https://github.com/sigstore/cosign/releases/download/v2.0.2/cosign-linux-amd64"
 	mv cosign-linux-amd64 cosign
 	chmod 755 cosign
 	mv cosign /usr/local/bin
-	cosign generate-key-pair –output-key prefix jenkins 
-	ls to make sure jenkins.pub and jenkins.key is created
+	cosign generate-key-pair --output-key-prefix jenkins
+Verify that jenkins.pub and jenkins.key is created
+	ls jenkins.key jenkins.pub 
 
 Install Kubectl logged as root
-	curl -LO https://dl.k8s.io/release/v1.27.1/bin/linux/amd64/kubectl
-
-	echo "$(cat kubectl.sha256)  kubectl" | sha256sum --check
-If valid, the output is: kubectl: OK
-	ls to see kubectl binary
+	curl -LO "https://dl.k8s.io/release/v1.27.1/bin/linux/amd64/kubectl"
 	chmod 755 kubectl
-	mv kubectl /usr/local/bin
-verify pods are created
-	kubecl get pods to 
+	mv kubectl  /usr/local/bin
+	ls to see kubectl binary
 
 Install Gcloud CLI as root
-
-	su - jenkins
+	sudo apt-get install apt-transport-https ca-certificates gnupg
+	echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
+	curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key --keyring /usr/share/keyrings/cloud.google.gpg add -
+	sudo apt-get update && sudo apt-get install google-cloud-cli
+First switch to jenkins user before next step
+	sudo su - jenkins
+	whoami
 	gcloud init
 
 Install Helm as root
